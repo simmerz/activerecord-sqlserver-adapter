@@ -3,7 +3,7 @@
 module ActiveRecord
   module ConnectionAdapters
     module SQLServer
-      BASE_SCHEMA_CREATION_CLASS = Rails::VERSION::MAJOR >= 6 && Rails::VERSION::MINOR >= 1 ?
+      BASE_SCHEMA_CREATION_CLASS = ((ActiveRecord.version <=> Gem::Version.new("6.1")) != -1) ?
         SchemaCreation :
         AbstractAdapter::SchemaCreation
 

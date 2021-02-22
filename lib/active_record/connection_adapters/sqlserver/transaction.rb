@@ -31,7 +31,7 @@ module ActiveRecord
     module SQLServerRealTransaction
       attr_reader :starting_isolation_level
 
-      if Rails::VERSION::MAJOR >= 6 && Rails::VERSION::MINOR >= 1
+      if (ActiveRecord.version <=> Gem::Version.new("6.1")) != -1
         def initialize(connection, **args)
           @connection = connection
           @starting_isolation_level = current_isolation_level if args[:isolation]
