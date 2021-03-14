@@ -431,7 +431,7 @@ module ActiveRecord
             SELECT
               #{lowercase_schema_reflection_sql('o.name')} AS [table_name],
               #{lowercase_schema_reflection_sql('c.name')} AS [name],
-              t.name AS [type],
+              c2.DATA_TYPE AS [type],
               d.definition AS [default_value],
               CASE
                 WHEN t.name IN ('decimal', 'bigint', 'int', 'money', 'numeric', 'smallint', 'smallmoney', 'tinyint')
@@ -478,6 +478,10 @@ module ActiveRecord
               ON k.parent_object_id = ic.object_id
               AND k.unique_index_id = ic.index_id
               AND c.column_id = ic.column_id
+            INNER JOIN INFORMATION_SCHEMA.COLUMNS c2
+              ON c.name = c2.COLUMN_NAME
+              AND s.name = c2.TABLE_SCHEMA
+              AND o.name = c2.TABLE_NAME
             WHERE
               o.name = #{object_name}
               AND s.name = #{schema_name}

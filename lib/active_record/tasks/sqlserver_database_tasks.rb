@@ -14,12 +14,12 @@ module ActiveRecord
                to: ActiveRecord::Base
 
       def initialize(configuration)
-        @configuration = configuration
+        @configuration = configuration.symbolize_keys
       end
 
       def create(master_established = false)
         establish_master_connection unless master_established
-        connection.create_database configuration["database"], configuration.merge("collation" => default_collation)
+        connection.create_database configuration[:database], configuration.merge(collation: default_collation)
         establish_connection configuration
       rescue ActiveRecord::StatementInvalid => e
         if /database .* already exists/i === e.message
@@ -31,7 +31,7 @@ module ActiveRecord
 
       def drop
         establish_master_connection
-        connection.drop_database configuration["database"]
+        connection.drop_database configuration[:database]
       end
 
       def charset
@@ -49,14 +49,14 @@ module ActiveRecord
       end
 
       def structure_dump(filename, extra_flags)
-        server_arg = "-S #{Shellwords.escape(configuration['host'])}"
-        server_arg += ":#{Shellwords.escape(configuration['port'])}" if configuration["port"]
+        server_arg = "-S #{Shellwords.escape(configuration[:host])}"
+        server_arg += ":#{Shellwords.escape(configuration[:port])}" if configuration[:port]
         command = [
           "defncopy-ttds",
           server_arg,
-          "-D #{Shellwords.escape(configuration['database'])}",
-          "-U #{Shellwords.escape(configuration['username'])}",
-          "-P #{Shellwords.escape(configuration['password'])}",
+          "-D #{Shellwords.escape(configuration[:database])}",
+          "-U #{Shellwords.escape(configuration[:username])}",
+          "-P #{Shellwords.escape(configuration[:password])}",
           "-o #{Shellwords.escape(filename)}",
         ]
         table_args = connection.tables.map { |t| Shellwords.escape(t) }
@@ -71,6 +71,7 @@ module ActiveRecord
         dump.gsub!(/nvarchar\(8000\)/, "nvarchar(4000)")      # Fix nvarchar(8000) column defs
         dump.gsub!(/nvarchar\(-1\)/, "nvarchar(max)")         # Fix nvarchar(-1) column defs
         dump.gsub!(/text\(\d+\)/, "text")                     # Fix text(16) column defs
+        wrap_column_names(dump)
         File.open(filename, "w") { |file| file.puts dump }
       end
 
@@ -84,12 +85,27 @@ module ActiveRecord
         @configuration
       end
 
+      def wrap_column_names(dump)
+        matches = dump.scan(/\t[(,].*/)
+        matches.each do |match|
+          orig_match = match.dup
+          nullable_regex = /((NOT )?NULL)/i
+          nullable = orig_match.match(nullable_regex)&.captures&.first.dup
+          match.gsub!(nullable_regex, "") if nullable
+          end_parts = [nullable]
+          parts = match.split
+          start_parts = [parts.shift]
+          end_parts << parts.pop
+          new_definition = [start_parts + [parts.join(" ").prepend("[").concat("]")] + end_parts.reverse].join(" ").strip
+          dump.gsub!(orig_match, new_definition)
+        end
+
       def default_collation
-        configuration["collation"] || DEFAULT_COLLATION
+        configuration[:collation] || DEFAULT_COLLATION
       end
 
       def establish_master_connection
-        establish_connection configuration.merge("database" => "master")
+        establish_connection configuration.merge(database: "master")
       end
     end
 
@@ -110,9 +126,9 @@ module ActiveRecord
         end
 
         def configuration_host_ip(configuration)
-          return nil unless configuration["host"]
+          return nil unless configuration[:host]
 
-          Socket::getaddrinfo(configuration["host"], "echo", Socket::AF_INET)[0][3]
+          Socket::getaddrinfo(configuration[:host], "echo", Socket::AF_INET)[0][3]
         end
 
         def local_ipaddr?(host_ip)
