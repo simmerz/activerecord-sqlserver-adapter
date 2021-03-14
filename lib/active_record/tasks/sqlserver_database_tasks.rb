@@ -100,6 +100,8 @@ module ActiveRecord
           dump.gsub!(orig_match, new_definition)
         end
 
+      end
+
       def default_collation
         configuration[:collation] || DEFAULT_COLLATION
       end
