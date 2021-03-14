@@ -358,23 +358,23 @@ module ActiveRecord
           results = sp_executesql(sql, "SCHEMA", binds)
           results.map do |ci|
             ci = ci.symbolize_keys
-            ci[:_type] = ci[:type]
+            ci[:_type] = ci[:default_type]
             ci[:table_name] = view_tblnm || table_name
-            ci[:type] = case ci[:type]
+            ci[:type] = case ci[:_type]
                         when /^bit|image|text|ntext|datetime$/
-                          ci[:type]
+                          ci[:_type]
                         when /^datetime2|datetimeoffset$/i
-                          "#{ci[:type]}(#{ci[:datetime_precision]})"
+                          "#{ci[:_type]}(#{ci[:datetime_precision]})"
                         when /^time$/i
-                          "#{ci[:type]}(#{ci[:datetime_precision]})"
+                          "#{ci[:_type]}(#{ci[:datetime_precision]})"
                         when /^numeric|decimal$/i
-                          "#{ci[:type]}(#{ci[:numeric_precision]},#{ci[:numeric_scale]})"
+                          "#{ci[:_type]}(#{ci[:numeric_precision]},#{ci[:numeric_scale]})"
                         when /^float|real$/i
-                          "#{ci[:type]}"
+                          "#{ci[:_type]}"
                         when /^char|nchar|varchar|nvarchar|binary|varbinary|bigint|int|smallint$/
-                          ci[:length].to_i == -1 ? "#{ci[:type]}(max)" : "#{ci[:type]}(#{ci[:length]})"
+                          ci[:length].to_i == -1 ? "#{ci[:_type]}(max)" : "#{ci[:_type]}(#{ci[:length]})"
                         else
-                          ci[:type]
+                          ci[:_type]
                         end
             ci[:default_value],
             ci[:default_function] = begin
@@ -403,10 +403,10 @@ module ActiveRecord
                 type = case ci[:type]
                        when /smallint|int|bigint/ then ci[:_type]
                        when /bit/ then 'smallint'
-                       else ci[:type]
+                       else ci[:_type]
                        end
                 value = default.match(/\A\((.*)\)\Z/m)[1]
-                value = select_value("SELECT CAST(#{value} AS #{type}) AS value", "SCHEMA")
+                value = select_value("SELECT CAST(#{value} AS #{type}) AS value", "SCHEMA") unless type == ci[:type]
 
                 [value, nil]
               end
@@ -431,7 +431,8 @@ module ActiveRecord
             SELECT
               #{lowercase_schema_reflection_sql('o.name')} AS [table_name],
               #{lowercase_schema_reflection_sql('c.name')} AS [name],
-              c2.DATA_TYPE AS [type],
+              t.name AS [type],
+              c2.DATA_TYPE AS [default_type],
               d.definition AS [default_value],
               CASE
                 WHEN t.name IN ('decimal', 'bigint', 'int', 'money', 'numeric', 'smallint', 'smallmoney', 'tinyint')
